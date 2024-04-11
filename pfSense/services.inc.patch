@@ -1,0 +1,43 @@
+--- ./services.inc      2024-04-11 17:16:28.229875000 +0200
++++ /etc/inc/services.inc       2024-04-11 17:29:36.642086000 +0200
+@@ -566,9 +566,20 @@
+                'library' => '/usr/local/lib/kea/hooks/libdhcp_lease_cmds.so',
+        ];
+
++       // Set script hook for passing leases to unbound-control local-zone
++       $kea_run_script_hook = [
++               'library' => '/usr/local/lib/kea/hooks/libdhcp_run_script.so',
++               'parameters' => [
++                       'name' => '/root/kea-lease-unbound-control.sh',
++                       'sync' => false
++               ]
++       ];
++
+        /* wire up lease_cmds hook */
+        $keaconf['Dhcp6']['hooks-libraries'][] = $kea_lease_cmds_hook;
+
++       $keaconf['Dhcp6']['hooks-libraries'][] = $kea_run_script_hook;
++
+        $dhcpdv6ifs = array();
+
+        // $dhcpv6num = 0;
+@@ -1117,8 +1128,19 @@
+                'library' => '/usr/local/lib/kea/hooks/libdhcp_lease_cmds.so',
+        ];
+
++       // Set script hook for passing leases to unbound-control local-zone
++       $kea_run_script_hook = [
++               'library' => '/usr/local/lib/kea/hooks/libdhcp_run_script.so',
++               'parameters' => [
++                       'name' => '/root/kea-lease-unbound-control.sh',
++                       'sync' => false
++               ]
++       ];
++
+        /* wire up lease_cmds hook */
+        $keaconf['Dhcp4']['hooks-libraries'][] = $kea_lease_cmds_hook;
++
++       $keaconf['Dhcp4']['hooks-libraries'][] = $kea_run_script_hook;
+
+        /* Only consider DNS servers with IPv4 addresses for the IPv4 DHCP server. */
+        $dns_arrv4 = array();
