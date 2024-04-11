@@ -27,6 +27,8 @@ Refer to the Kea documentation for the hook points and their arguments:
 
 ### PfSense specific configuration
 pfSense users can use the pfSense package "Kea DHCP" to configure the hooks by patching /etc/inc/services.inc to activate kea's hooks and call this script
+- by using the provided patch (pfSense 2.7.2-RELEASE):
+    - pfSense/services.inc.patch: https://github.com/nvandamme/kea-lease-unbound-control/blob/main/pfSense/services.inc.patch
 - in /etc/inc/services.inc, add the following lines to the `services_kea4_configure()` function:
 ```diff 
 $kea_lease_cmds_hook = [
