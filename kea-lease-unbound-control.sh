@@ -1,5 +1,11 @@
 #!/bin/sh
 
+###
+kea-lease-unbound-control.sh
+https://github.com/nvandamme/kea-lease-unbound-control
+Licence: GPL3
+###
+
 # kea-lease-unbound-control.sh
 PROGNAME="$(basename $0)"
 
