@@ -15,6 +15,19 @@ Credits to:
 
 - Install kea
 - Install unbound
+- **Ensure that domain-search is setup** via DCHP or on each LAN hosts manually as it is mandaotory for unbound shortname hosts expansion:
+
+```
+~ # nslookup foo
+Server: 192.168.1.1
+Address: 192.168.1.1#53
+
+Non-authoritative answer:
+Name:   foo.lan
+Address: 192.168.1.2
+Name:   foo.lan
+Address: fe80::ffff:ffff:dead:beaf
+```
 
 ## Setup
 
