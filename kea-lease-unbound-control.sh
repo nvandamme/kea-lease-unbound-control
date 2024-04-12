@@ -239,7 +239,7 @@ add_lease4() {
     log "Adding A and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2"
     PTR=$(ip_to_ptr $2)
     $UNBOUND_CONTROL local_data "${HOSTNAME}"."${LOCAL_DOMAIN}" A "${2}"
-    $UNBOUND_CONTROL local_data "${ptr}" PTR "${HOSTNAME}"."${LOCAL_DOMAIN}"
+    $UNBOUND_CONTROL local_data "${PTR}" PTR "${HOSTNAME}"."${LOCAL_DOMAIN}"
     log "Added A and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2 -> ${PTR}"
 }
 
@@ -251,7 +251,7 @@ del_lease4() {
     log "Removing A and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2"
     PTR=$(ip_to_ptr $2)
     $UNBOUND_CONTROL local_data_remove "${HOSTNAME}"."${LOCAL_DOMAIN}" A "${2}"
-    $UNBOUND_CONTROL local_data_remove "${ptr}" PTR "${HOSTNAME}"
+    $UNBOUND_CONTROL local_data_remove "${PTR}" PTR "${HOSTNAME}"
     log "Removed A and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2 -> ${PTR}"
 }
 

@@ -29,6 +29,14 @@ Name:   foo.lan
 Address: fe80::ffff:ffff:dead:beaf
 ```
 
+```
+~ # unbound-control list_local_data | grep foo
+foo.lan.    3600    IN  AAAA    fe80::ffff:ffff:dead:beaf
+foo.lan.    3600    IN  A 192.168.1.2
+2.1.168.192.in-addr.arpa.    3600    IN  PTR    foo.lan.
+f.e.e.b.d.a.e.d.f.f.f.f.f.f.f.f.0.0.0.0.0.0.0.0.0.0.0.0.0.8.e.f.ip6.arpa.     3600    IN  PTR    foo.lan.
+```
+
 ## Setup
 
 - Configure unbound-control to listen on 127.0.0.1:953
