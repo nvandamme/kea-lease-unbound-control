@@ -32,7 +32,9 @@ Credits to:
 ### PfSense specific configuration
 pfSense users can use the pfSense package "Kea DHCP" to configure the hooks by patching /etc/inc/services.inc to activate kea's hooks and call this script
 - by using the provided patch (pfSense 2.7.2-RELEASE):
-    - pfSense/services.inc.patch: https://github.com/nvandamme/kea-lease-unbound-control/blob/main/pfSense/services.inc.patch
+    - pfSense/etc/inc/services.inc.patch: https://github.com/nvandamme/kea-lease-unbound-control/blob/main/pfSense/etc/inc/services.inc.patch
+- by using the provided configuration file (and copy it in /usr/loca/etc/):
+    - pfSense/usr/local/etc/kea-lease-unbound-control.conf: https://github.com/nvandamme/kea-lease-unbound-control/blob/main/pfSense/usr/local/etc/kea-lease-unbound-control.conf
 - in /etc/inc/services.inc, add the following lines to the `services_kea4_configure()` function:
 ```diff 
 $kea_lease_cmds_hook = [
