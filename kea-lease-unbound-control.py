@@ -2,7 +2,6 @@
 
 import os
 from pathlib import Path
-import re
 import sys
 import subprocess
 from datetime import datetime
