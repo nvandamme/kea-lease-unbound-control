@@ -2,10 +2,12 @@
 
 import os
 from pathlib import Path
+import re
 import sys
 import subprocess
 from datetime import datetime
 import ipaddress
+from typing import cast
 
 # kea-lease-unbound-control.sh
 PROGNAME = os.path.basename(sys.argv[0])
@@ -169,7 +171,7 @@ def get_kea_hook_env_args() -> dict[str, str]:
     return env_args
 
 
-def is_ipv4(ip_str: str) -> bool:
+def is_ipv4(ip_str: str) -> bool | ipaddress.IPv4Network:
     """
     Check if string is an IPv4 address
 
@@ -181,13 +183,12 @@ def is_ipv4(ip_str: str) -> bool:
     """
     ip, _ = ip_str.split("/") if "/" in ip_str else (ip_str, "")
     try:
-        ipaddress.IPv4Address(ip)
-        return True
+        return ipaddress.IPv4Network(ip, strict=False)
     except ValueError:
         return False
 
 
-def ip_to_ptr(ip_str: str) -> str:
+def ip_to_ptr(ip_str: str) -> str | None:
     """
     Convert IPv4 address to PTR record
 
@@ -197,11 +198,29 @@ def ip_to_ptr(ip_str: str) -> str:
     Returns:
         str: PTR record
     """
-    ip, _ = ip_str.split("/") if "/" in ip_str else (ip_str, "")
-    return ipaddress.IPv4Address(ip).reverse_pointer
+    ip = is_ipv4(ip_str)
+    if not is_ipv4(ip_str):
+        return None
+    return cast(ipaddress.IPv4Network, ip).reverse_pointer
 
 
-def expand_ipv6(ip_str: str) -> str:
+def is_ipv6(ip_str: str) -> bool | ipaddress.IPv6Network:
+    """
+    Check if string is an IPv6 address
+
+    Args:
+        ip_str (str): IP address
+
+    Returns:
+        bool: True if string is an IPv6 address, False otherwise
+    """
+    try:
+        return ipaddress.IPv6Network(ip_str, strict=False)
+    except ValueError:
+        return False
+
+
+def expand_ipv6(ip_str: str) -> str | None:
     """
     Expand IPv6 address
 
@@ -211,9 +230,10 @@ def expand_ipv6(ip_str: str) -> str:
     Returns:
         str: Expanded IPv6 address
     """
-    ip, mask = ip_str.split("/") if "/" in ip_str else (ip_str, "")
-    ip = ipaddress.IPv6Address(ip).exploded
-    return f"{ip}/{mask}" if mask else ip
+    ip = is_ipv6(ip_str)
+    if not is_ipv6(ip_str):
+        return None
+    return cast(ipaddress.IPv6Network, ip).exploded
 
 
 def compress_ipv6(ip_str: str) -> str:
@@ -226,27 +246,10 @@ def compress_ipv6(ip_str: str) -> str:
     Returns:
         str: Compressed IPv6 address
     """
-    ip, mask = ip_str.split("/") if "/" in ip_str else (ip_str, "")
-    ip = ipaddress.IPv6Address(ip_str).compressed
-    return f"{ip}/{mask}" if mask else ip
-
-
-def is_ipv6(ip_str: str) -> bool:
-    """
-    Check if string is an IPv6 address
-
-    Args:
-        ip_str (str): IP address
-
-    Returns:
-        bool: True if string is an IPv6 address, False otherwise
-    """
-    ip, _ = ip_str.split("/") if "/" in ip_str else (ip_str, "")
-    try:
-        ipaddress.IPv6Address(ip)
-        return True
-    except ValueError:
-        return False
+    ip = is_ipv6(ip_str)
+    if not is_ipv6(ip_str):
+        return ip_str
+    return cast(ipaddress.IPv6Network, ip).compressed
 
 
 def clean_hostname(hostname: str) -> str:
@@ -272,14 +275,13 @@ def ip6_to_ptr6(ip_str: str) -> str | None:
     Returns:
         str: PTR record
     """
-    if not is_ipv6(ip_str):
+    ip = is_ipv6(ip_str)
+    if not ip:
         return None
-    ip = ipaddress.IPv6Address(ip_str)
-    ptr = ip.reverse_pointer
-    return f"{ptr}.ip6.arpa"
+    return cast(ipaddress.IPv6Network, ip).reverse_pointer
 
 
-def ptr_to_ip(ptr_str: str) -> str | None:
+def ptr_to_ip(ptr_str: str) -> ipaddress.IPv4Network | None:
     """
     Convert PTR record to IPv4 address
 
@@ -293,10 +295,15 @@ def ptr_to_ip(ptr_str: str) -> str | None:
     if parts[-2:] != ["in-addr", "arpa"]:
         return None
     ip_parts = [parts[i] for i in range(len(parts) - 3, -1, -1)]
-    return ".".join(ip_parts)
+    ip = None
+    try:
+        ip = ipaddress.IPv4Network(".".join(ip_parts), strict=False)
+    except ipaddress.AddressValueError:
+        return None
+    return ip
 
 
-def ptr6_to_ip6(ptr_str: str) -> str | None:
+def ptr6_to_ip6(ptr_str: str) -> ipaddress.IPv6Network | None:
     """
     Convert PTR record to IPv6 address
 
@@ -313,7 +320,40 @@ def ptr6_to_ip6(ptr_str: str) -> str | None:
     ip_str = ":".join(
         ["".join(ip_parts[i : i + 4]) for i in range(0, len(ip_parts), 4)]
     )
-    return ipaddress.IPv6Address(ip_str).compressed
+    ip = None
+    try:
+        ip = ipaddress.IPv6Network(ip_str, strict=False)
+    except ipaddress.AddressValueError:
+        return None
+    return ip
+
+
+def unbound_control_exec(command: str, *args: str) -> tuple[bool, str]:
+    """
+    Run unbound-control command
+
+    Args:
+    command (str): unbound-control command
+    args (str): unbound-control command arguments
+
+    Returns:
+    str: unbound-control command output
+    """
+    result = subprocess.run([UNBOUND_CONTROL, command, *args], capture_output=True)
+    if result.returncode != 0:
+        log(f"Failed to run unbound-control {command} {' '.join(args)}")
+        return (
+            False,
+            (
+                result.stderr.decode("utf-8")
+                if result.stderr
+                else result.stdout.decode("utf-8")
+            ),
+        )
+    if result.stdout.decode("utf-8").startswith("error"):
+        log(f"Failed to run unbound-control {command} {' '.join(args)}")
+        return (False, result.stderr.decode("utf-8"))
+    return (True, result.stdout.decode("utf-8"))
 
 
 def add_lease4(hostname: str, ipv4_address: str) -> None:
@@ -327,15 +367,17 @@ def add_lease4(hostname: str, ipv4_address: str) -> None:
     HOSTNAME = clean_hostname(hostname)
     log(f"Adding A and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address}")
     PTR = ip_to_ptr(ipv4_address)
-    subprocess.run(
-        [UNBOUND_CONTROL, "local_data", f"{HOSTNAME}.{LOCAL_DOMAIN}", "A", ipv4_address]
+    if not PTR:
+        log(f"Invalid IPv4 address: {ipv4_address}")
+        return None
+    result = unbound_control_exec(
+        "local_data", f"{HOSTNAME}.{LOCAL_DOMAIN}", "A", ipv4_address
     )
-    subprocess.run(
-        [UNBOUND_CONTROL, "local_data", PTR, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"]
-    )
-    log(
-        f"Added A and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address} -> {PTR}"
-    )
+    if result[0] and result[1].startswith("ok"):
+        log(f"Added A record for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address}")
+        result = unbound_control_exec("local_data", PTR, "PTR", HOSTNAME)
+        if result[0] and result[1].startswith("ok"):
+            log(f"Added PTR record for {HOSTNAME}.{LOCAL_DOMAIN} -> {PTR}")
 
 
 def del_lease4(hostname: str, ipv4_address: str) -> None:
@@ -349,19 +391,17 @@ def del_lease4(hostname: str, ipv4_address: str) -> None:
     HOSTNAME = clean_hostname(hostname)
     log(f"Removing A and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address}")
     PTR = ip_to_ptr(ipv4_address)
-    subprocess.run(
-        [
-            UNBOUND_CONTROL,
-            "local_data_remove",
-            f"{HOSTNAME}.{LOCAL_DOMAIN}",
-            "A",
-            ipv4_address,
-        ]
+    if not PTR:
+        log(f"Invalid IPv4 address: {ipv4_address}")
+        return None
+    result = unbound_control_exec(
+        "local_data_remove", f"{HOSTNAME}.{LOCAL_DOMAIN}", "A", ipv4_address
     )
-    subprocess.run([UNBOUND_CONTROL, "local_data_remove", PTR, "PTR", HOSTNAME])
-    log(
-        f"Removed A and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address} -> {PTR}"
-    )
+    if result[0] and result[1].startswith("ok"):
+        log(f"Removed A record for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address}")
+        result = unbound_control_exec("local_data_remove", PTR, "PTR", HOSTNAME)
+        if result[0] and result[1].startswith("ok"):
+            log(f"Removed PTR record for {PTR} -> {HOSTNAME}.{LOCAL_DOMAIN}")
 
 
 def add_lease6(
@@ -378,43 +418,32 @@ def add_lease6(
     HOSTNAME = clean_hostname(hostname)
     log(f"Adding AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}")
     PTR6 = ip6_to_ptr6(ipv6_address)
-    subprocess.run(
-        [
-            UNBOUND_CONTROL,
-            "local_data",
-            f"{HOSTNAME}.{LOCAL_DOMAIN}",
-            "AAAA",
-            ipv6_address,
-        ]
+    if not PTR6:
+        log(f"Invalid IPv6 address: {ipv6_address}")
+        return None
+    result = unbound_control_exec(
+        "local_data", f"{HOSTNAME}.{LOCAL_DOMAIN}", "AAAA", ipv6_address
     )
-    subprocess.run([UNBOUND_CONTROL, "local_data", PTR6, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"])  # type: ignore
+    if result[0] and result[1].startswith("ok"):
+        log(f"Added AAAA record for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}")
+        result = unbound_control_exec("local_data", PTR6, "PTR", HOSTNAME)
+        if result[0] and result[1].startswith("ok"):
+            log(f"Added PTR record for {HOSTNAME}.{LOCAL_DOMAIN} -> {PTR6}")
     if ipv6_local_address:
         PTR6LOCAL = ip6_to_ptr6(ipv6_local_address)
-        subprocess.run(
-            [
-                UNBOUND_CONTROL,
-                "local_data",
-                f"{HOSTNAME}.{LOCAL_DOMAIN}",
-                "AAAA",
-                ipv6_local_address,
-            ]
+        if not PTR6LOCAL:
+            log(f"Invalid IPv6 address: {ipv6_local_address}")
+            return None
+        result = unbound_control_exec(
+            "local_data", f"{HOSTNAME}.{LOCAL_DOMAIN}", "AAAA", ipv6_local_address
         )
-        subprocess.run(
-            [
-                UNBOUND_CONTROL,
-                "local_data",
-                f"{PTR6LOCAL}.{LOCAL_DOMAIN}",
-                "PTR",
-                HOSTNAME,
-            ]
-        )
-        log(
-            f"Added AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}, {ipv6_local_address} -> {PTR6}, {PTR6LOCAL}"
-        )
-    else:
-        log(
-            f"Added AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address} -> {PTR6}"
-        )
+        if result[0] and result[1].startswith("ok"):
+            log(
+                f"Added AAAA record for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_local_address}"
+            )
+            result = unbound_control_exec("local_data", PTR6LOCAL, "PTR", HOSTNAME)
+            if result[0] and result[1].startswith("ok"):
+                log(f"Added PTR record for {HOSTNAME}.{LOCAL_DOMAIN} -> {PTR6LOCAL}")
 
 
 def del_lease6(
@@ -433,35 +462,37 @@ def del_lease6(
         f"Removing AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}"
     )
     PTR6 = ip6_to_ptr6(ipv6_address)
-    subprocess.run(
-        [
-            UNBOUND_CONTROL,
+    if not PTR6:
+        log(f"Invalid IPv6 address: {ipv6_address}")
+        return None
+    result = unbound_control_exec(
+        "local_data_remove", f"{HOSTNAME}.{LOCAL_DOMAIN}", "AAAA", ipv6_address
+    )
+    if result[0] and result[1].startswith("ok"):
+        log(f"Removed AAAA record for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}")
+        result = unbound_control_exec("local_data_remove", PTR6, "PTR", HOSTNAME)
+        if result[0] and result[1].startswith("ok"):
+            log(f"Removed PTR record for {PTR6} -> {HOSTNAME}.{LOCAL_DOMAIN}")
+    if ipv6_local_address:
+        PTR6LOCAL = ip6_to_ptr6(ipv6_local_address)
+        if not PTR6LOCAL:
+            log(f"Invalid IPv6 address: {ipv6_local_address}")
+            return None
+        result = unbound_control_exec(
             "local_data_remove",
             f"{HOSTNAME}.{LOCAL_DOMAIN}",
             "AAAA",
-            ipv6_address,
-        ]
-    )
-    subprocess.run([UNBOUND_CONTROL, "local_data_remove", PTR6, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"])  # type: ignore
-    if ipv6_local_address:
-        PTR6LOCAL = ip6_to_ptr6(ipv6_local_address)
-        subprocess.run(
-            [
-                UNBOUND_CONTROL,
-                "local_data_remove",
-                f"{HOSTNAME}.{LOCAL_DOMAIN}",
-                "AAAA",
-                ipv6_local_address,
-            ]
+            ipv6_local_address,
         )
-        subprocess.run([UNBOUND_CONTROL, "local_data_remove", PTR6LOCAL, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"])  # type: ignore
-        log(
-            f"Removed AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}, {ipv6_local_address} -> {PTR6}, {PTR6LOCAL}"
-        )
-    else:
-        log(
-            f"Removed AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address} -> {PTR6}"
-        )
+        if result[0] and result[1].startswith("ok"):
+            log(
+                f"Removed AAAA record for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_local_address}"
+            )
+            result = unbound_control_exec(
+                "local_data_remove", PTR6LOCAL, "PTR", HOSTNAME
+            )
+            if result[0] and result[1].startswith("ok"):
+                log(f"Removed PTR record for {PTR6LOCAL} -> {HOSTNAME}.{LOCAL_DOMAIN}")
 
 
 def handle_add_lease4(env: dict[str, str] | None = None) -> None:
