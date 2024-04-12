@@ -16,7 +16,7 @@ Credits to:
 - Configure unbound-control to listen on 127.0.0.1:953
 - Configure unbound local_zone with a local domain, e.g.:
 `local-zone: "local." transparent`
-- Configure kea to call this script with the appropriate hook:
+- Configure kea to call this script with the appropriate hook (using kea's default `libdhcp_run_script.so`):
 ```json
 "hooks-libraries": [
     {
