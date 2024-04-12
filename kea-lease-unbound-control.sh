@@ -41,6 +41,9 @@ fi
 if [ -z "$UNBOUND_CONTROL_PORT" ]; then
     UNBOUND_CONTROL_PORT="953"
 fi
+if [ -z "$LOCAL_DOMAIN" ]; then
+    LOCAL_DOMAIN="lan"
+fi
 if [ -z "log_FILE" ]; then
     LOG_FILE="/var/log/kea-lease-unbound-control.log"
 fi
@@ -61,28 +64,44 @@ Setup:
 - Install kea
 - Install unbound
 - Configure unbound-control to listen on 127.0.0.1:953
-- Configure unbound local_zone with a local domain, e.g.:
-    - local-zone: "local." transparent
-- Configure kea to call this script with the appropriate hook:
-```json	
+- Configure unbound local_zone with a local domain
+```sh
+local-zone: "lan." transparent
+```
+- Configure kea to call this script with the appropriate hook (using kea's default `libdhcp_run_script.so`)
+```json
 "hooks-libraries": [
     {
         "library": "/usr/local/lib/kea/hooks/libdhcp_run_script.so",
         "parameters": {
-            "name": "/path/to/kea-lease-unbound-control.sh",
+            "name": "/usr/local/bin/kea-lease-unbound-control.sh",
             "sync": "false"
         }
     }
 ]
 ```
-- Configure environment variables via `/path/to/kea-lease-unbound-control.sh.env` or your preferred `etc` location:
+- Configure kea to add DCHP option domain-search match the unbound default local-zone
+```json
+"option-data": [
+        {
+           "name": "domain-name-servers",
+           "data": "192.168.1.1, fe80::ffff:ffff:ffff:ffff"
+        },
+        {
+            "name": "domain-name",
+            "data": "lan"
+        }
+]
+```
+- Configure environment variables via `/path/to/kea-lease-unbound-control.sh.env` or your preferred `etc` location
 ```sh
-    UNBOUND_CONTROL_PATH="/usr/sbin/unbound-control"
-    UNBOUND_CONFIG_PATH="/etc/unbound/unbound.conf"
-    UNBOUND_CONTROL_IP="127.0.0.1"
-    UNBOUND_CONTROL_PORT="953"
-    LOG_ENABLED=1
-    LOG_FILE="/var/log/kea-lease-unbound-control.log"
+UNBOUND_CONTROL_PATH="/usr/sbin/unbound-control"
+UNBOUND_CONFIG_PATH="/etc/unbound/unbound.conf"
+UNBOUND_CONTROL_IP="127.0.0.1"
+UNBOUND_CONTROL_PORT="953"
+LOCAL_DOMAIN="lan"
+LOG_ENABLED=1
+LOG_FILE="/var/log/kea-lease-unbound-control.log"
 ```
 - Ensure the config is readable and the script is executable and readable by kea's process user:
 ```sh
@@ -217,11 +236,11 @@ add_lease4() {
     # $1 = hostname (LEASE4_HOSTNAME)
     # $2 = ipv4 address (LEASE4_ADDRESS)
     HOSTNAME=$(clean_hostname $1)
-    log "Adding A and PTR records for ${HOSTNAME} -> $2"
+    log "Adding A and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2"
     PTR=$(ip_to_ptr $2)
-    $UNBOUND_CONTROL local_data "${HOSTNAME}" A "${2}"
-    $UNBOUND_CONTROL local_data "${ptr}" PTR "${HOSTNAME}"
-    log "Added A and PTR records for ${HOSTNAME} -> $2 -> ${PTR}"
+    $UNBOUND_CONTROL local_data "${HOSTNAME}"."${LOCAL_DOMAIN}" A "${2}"
+    $UNBOUND_CONTROL local_data "${ptr}" PTR "${HOSTNAME}"."${LOCAL_DOMAIN}"
+    log "Added A and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2 -> ${PTR}"
 }
 
 # Remove lease4 entry from unbound local data
@@ -229,11 +248,11 @@ del_lease4() {
     # $1 = hostname (LEASE4_HOSTNAME)
     # $2 = ipv4 address (LEASE4_ADDRESS)
     HOSTNAME=$(clean_hostname $1)
-    log "Removing A and PTR records for ${HOSTNAME} -> $2"
+    log "Removing A and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2"
     PTR=$(ip_to_ptr $2)
-    $UNBOUND_CONTROL local_data_remove "${HOSTNAME}" A "${2}"
+    $UNBOUND_CONTROL local_data_remove "${HOSTNAME}"."${LOCAL_DOMAIN}" A "${2}"
     $UNBOUND_CONTROL local_data_remove "${ptr}" PTR "${HOSTNAME}"
-    log "Removed A and PTR records for ${HOSTNAME} -> $2 -> ${PTR}"
+    log "Removed A and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2 -> ${PTR}"
 }
 
 # Add lease6 entry to unbound local data
@@ -241,17 +260,17 @@ add_lease6() {
     # $1 = hostname (LEASE6_HOSTNAME)
     # $2 = ipv6 address (LEASE6_ADDRESS)
     HOSTNAME=$(clean_hostname $1)
-    log "Adding AAAA and PTR records for ${HOSTNAME} -> $2"
+    log "Adding AAAA and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2"
     PTR6=$(ip6_to_ptr6 $2)
-    $UNBOUND_CONTROL local_data "${HOSTNAME}" AAAA "${2}"
-    $UNBOUND_CONTROL local_data "${PTR6}" PTR "${HOSTNAME}"
+    $UNBOUND_CONTROL local_data "${HOSTNAME}"."${LOCAL_DOMAIN}" AAAA "${2}"
+    $UNBOUND_CONTROL local_data "${PTR6}" PTR "${HOSTNAME}"."${LOCAL_DOMAIN}"
     if [ $3 ]; then
         PTR6LOCAL=$(ip6_to_ptr6 $3)
-        $UNBOUND_CONTROL local_data "${HOSTNAME}" AAAA "${3}"
-        $UNBOUND_CONTROL local_data "${PTR6LOCAL}" PTR "${HOSTNAME}"
-        log "Added AAAA and PTR records for ${HOSTNAME} -> $2, $3 -> ${PTR6}, ${PTR6LOCAL}"
+        $UNBOUND_CONTROL local_data "${HOSTNAME}"."${LOCAL_DOMAIN}" AAAA "${3}"
+        $UNBOUND_CONTROL local_data "${PTR6LOCAL}"."${LOCAL_DOMAIN}" PTR "${HOSTNAME}"
+        log "Added AAAA and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2, $3 -> ${PTR6}, ${PTR6LOCAL}"
     else
-        log "Added AAAA and PTR records for ${HOSTNAME} -> $2, $3 -> ${PTR6}"
+        log "Added AAAA and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2, $3 -> ${PTR6}"
     fi
 }
 
@@ -260,17 +279,17 @@ del_lease6() {
     # $1 = hostname (LEASE6_HOSTNAME)
     # $2 = ipv6 address (LEASE6_ADDRESS)
     HOSTNAME=$(clean_hostname $1)
-    log "Removing AAAA and PTR records for ${HOSTNAME} -> $2"
+    log "Removing AAAA and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2"
     PTR6=$(ip6_to_ptr6 $2)
-    $UNBOUND_CONTROL local_data_remove "${HOSTNAME}" AAAA "${2}"
-    $UNBOUND_CONTROL local_data_remove "${PTR6}" PTR "${HOSTNAME}"
+    $UNBOUND_CONTROL local_data_remove "${HOSTNAME}"."${LOCAL_DOMAIN}" AAAA "${2}"
+    $UNBOUND_CONTROL local_data_remove "${PTR6}" PTR "${HOSTNAME}"."${LOCAL_DOMAIN}"
     if [ $3 ]; then
         PTR6LOCAL=$(ip6_to_ptr6 $3)
-        $UNBOUND_CONTROL local_data_remove "${HOSTNAME}" AAAA "${3}"
-        $UNBOUND_CONTROL local_data_remove "${PTR6LOCAL}" PTR "${HOSTNAME}"
-        log "Removed AAAA and PTR records for ${HOSTNAME} -> $2, $3 -> ${PTR6}, ${PTR6LOCAL}"
+        $UNBOUND_CONTROL local_data_remove "${HOSTNAME}"."${LOCAL_DOMAIN}" AAAA "${3}"
+        $UNBOUND_CONTROL local_data_remove "${PTR6LOCAL}" PTR "${HOSTNAME}"."${LOCAL_DOMAIN}"
+        log "Removed AAAA and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2, $3 -> ${PTR6}, ${PTR6LOCAL}"
     else
-        log "Removed AAAA and PTR records for ${HOSTNAME} -> $2 -> ${PTR6}"
+        log "Removed AAAA and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2 -> ${PTR6}"
     fi
 }
 
