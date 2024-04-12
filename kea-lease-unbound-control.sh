@@ -2,7 +2,7 @@
 
 ###
 # kea-lease-unbound-control.sh
-# verion: 0.1
+# version: 0.1
 # git: https://github.com/nvandamme/kea-lease-unbound-control
 # licence: GPL3
 ###
@@ -106,7 +106,7 @@ Setup:
         + 
         + $keaconf['Dhcp6']['hooks-libraries'][] = $kea_run_script_hook;
     ```
-- Configure environment variables via `/path/to/kea-lease-unbound-control.sh.env` or yout preferred `etc` location:
+- Configure environment variables via `/path/to/kea-lease-unbound-control.sh.env` or your preferred `etc` location:
     UNBOUND_CONTROL_PATH="/usr/sbin/unbound-control"
     UNBOUND_CONFIG_PATH="/etc/unbound/unbound.conf"
     UNBOUND_CONTROL_IP="127.0.0.1"
