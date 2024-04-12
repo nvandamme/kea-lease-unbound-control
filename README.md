@@ -28,46 +28,6 @@ Credits to:
     }
 ]
 ```
-
-### PfSense specific configuration
-pfSense users can use the pfSense package "Kea DHCP" to configure the hooks by patching /etc/inc/services.inc to activate kea's hooks and call this script
-- by using the provided patch (pfSense 2.7.2-RELEASE):
-    - pfSense/etc/inc/services.inc.patch: https://github.com/nvandamme/kea-lease-unbound-control/blob/main/pfSense/etc/inc/services.inc.patch
-- by using the provided configuration file (and copy it in /usr/loca/etc/):
-    - pfSense/usr/local/etc/kea-lease-unbound-control.conf: https://github.com/nvandamme/kea-lease-unbound-control/blob/main/pfSense/usr/local/etc/kea-lease-unbound-control.conf
-- in /etc/inc/services.inc, add the following lines to the `services_kea4_configure()` function:
-```diff 
-$kea_lease_cmds_hook = [
-        'library' => '/usr/local/lib/kea/hooks/libdhcp_lease_cmds.so',
-];
-
-+ $kea_run_script_hook = [
-+         'library' => '/usr/local/lib/kea/hooks/libdhcp_run_script.so',
-+         'parameters' => [
-+                 'name' => '/root/kea-lease-unbound-control.sh',
-+                 'sync' => false
-+         ]
-+ ];
-+ 
-+ $keaconf['Dhcp4']['hooks-libraries'][] = $kea_run_script_hook;
-```
-- in /etc/inc/services.inc, add the following lines to the `services_kea6_configure()` function:
-```diff 
-$kea_lease_cmds_hook = [
-        'library' => '/usr/local/lib/kea/hooks/libdhcp_lease_cmds.so',
-];
-
-+ $kea_run_script_hook = [
-+         'library' => '/usr/local/lib/kea/hooks/libdhcp_run_script.so',
-+         'parameters' => [
-+                 'name' => '/root/kea-lease-unbound-control.sh',
-+                 'sync' => false
-+         ]
-+ ];
-+ 
-+ $keaconf['Dhcp6']['hooks-libraries'][] = $kea_run_script_hook;
-```
-
 ## Configuration
 Configure environment variables via `/path/to/kea-lease-unbound-control.sh.env` or your system `etc` default path:
 ```sh
@@ -86,3 +46,47 @@ Config paths by search order:
 - /path/to/kea-lease-unbound-control.sh.env
 - /etc/default/kea-lease-unbound-control.conf
 
+## PfSense specific configuration
+pfSense users can use the pfSense package "Kea DHCP" to configure the hooks by patching /etc/inc/services.inc to activate kea's hooks and call this script
+
+### Configuration file
+pfSense configuration file (copy it to /usr/loca/etc/):
+- pfSense/usr/local/etc/kea-lease-unbound-control.conf: https://github.com/nvandamme/kea-lease-unbound-control/blob/main/pfSense/usr/local/etc/kea-lease-unbound-control.conf
+
+### Patching services.inc
+for pfSense 2.7.2-RELEASE:
+- pfSense/etc/inc/services.inc.patch: https://github.com/nvandamme/kea-lease-unbound-control/blob/main/pfSense/etc/inc/services.inc.patch
+
+### Manual editing services.inc
+in /etc/inc/services.inc, add the following lines to the `services_kea4_configure()` function:
+```diff 
+$kea_lease_cmds_hook = [
+        'library' => '/usr/local/lib/kea/hooks/libdhcp_lease_cmds.so',
+];
+
++ $kea_run_script_hook = [
++         'library' => '/usr/local/lib/kea/hooks/libdhcp_run_script.so',
++         'parameters' => [
++                 'name' => '/root/kea-lease-unbound-control.sh',
++                 'sync' => false
++         ]
++ ];
++ 
++ $keaconf['Dhcp4']['hooks-libraries'][] = $kea_run_script_hook;
+```
+in /etc/inc/services.inc, add the following lines to the `services_kea6_configure()` function:
+```diff 
+$kea_lease_cmds_hook = [
+        'library' => '/usr/local/lib/kea/hooks/libdhcp_lease_cmds.so',
+];
+
++ $kea_run_script_hook = [
++         'library' => '/usr/local/lib/kea/hooks/libdhcp_run_script.so',
++         'parameters' => [
++                 'name' => '/root/kea-lease-unbound-control.sh',
++                 'sync' => false
++         ]
++ ];
++ 
++ $keaconf['Dhcp6']['hooks-libraries'][] = $kea_run_script_hook;
+```
