@@ -4,6 +4,10 @@ Update unbound local data entries from kea leases using unbound-control
 Refer to the Kea documentation for the hook points and their arguments:
 - https://kea.readthedocs.io/en/latest/arm/hooks.html#libdhcp-run-script-so-run-script-support-for-external-hook-scripts
 
+Credits to:
+- https://github.com/zorun/kea-hook-runscript/blob/master/README.md for Kea's inner working
+- https://stackoverflow.com/users/1009901/yeti for `sh` compatible ipv6 address handling functions
+
 ## Requirements
 - Install kea
 - Install unbound
