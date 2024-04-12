@@ -178,7 +178,8 @@ def is_ipv4(ip_str: str) -> bool | ipaddress.IPv4Network:
         ip_str (str): IP address
 
     Returns:
-        bool: True if string is an IPv4 address, False otherwise
+        bool: False if string is not an IPv4 address
+        IPv4Network: IPv4Network object if string is an IPv4 address
     """
     ip, _ = ip_str.split("/") if "/" in ip_str else (ip_str, "")
     try:
@@ -211,7 +212,8 @@ def is_ipv6(ip_str: str) -> bool | ipaddress.IPv6Network:
         ip_str (str): IP address
 
     Returns:
-        bool: True if string is an IPv6 address, False otherwise
+        bool: False if string is not an IPv6 address
+        IPv6Network: IPv6Network object if string is an IPv6 address
     """
     try:
         return ipaddress.IPv6Network(ip_str, strict=False)
