@@ -44,7 +44,7 @@ fi
 if [ -z "$LOCAL_DOMAIN" ]; then
     LOCAL_DOMAIN="lan"
 fi
-if [ -z "log_FILE" ]; then
+if [ -z "$LOG_FILE" ]; then
     LOG_FILE="/var/log/kea-lease-unbound-control.log"
 fi
 
@@ -60,6 +60,15 @@ Script to manage unbound local data entries for kea leases
 Refer to the Kea documentation for the hook points and their arguments:
 - https://kea.readthedocs.io/en/latest/arm/hooks.html#libdhcp-run-script-so-run-script-support-for-external-hook-scripts
 
+Options:
+-h, --help      Display this help and exit
+-v, --version   Output version information and exit
+-s, --setup     Display setup instructions
+EOF
+)
+
+# Display setup instructions
+SETUP=$(cat <<-'EOF'
 Setup:
 - Install kea
 - Install unbound
@@ -109,11 +118,6 @@ chown kea:kea /path/to/kea-lease-unbound-control.sh
 chmod +x /path/to/kea-lease-unbound-control.sh
 chown kea:kea /path/to/kea-lease-unbound-control.sh.env
 ```
-
-Options:
--h, --help      Display this help and exit
--v, --version   Output version information and exit
--s, --setup     Display setup instructions
 EOF
 )
 
@@ -259,6 +263,7 @@ del_lease4() {
 add_lease6() {
     # $1 = hostname (LEASE6_HOSTNAME)
     # $2 = ipv6 address (LEASE6_ADDRESS)
+    # $3 = ipv6 local address (QUERY6_REMOTE_ADDR)
     HOSTNAME=$(clean_hostname $1)
     log "Adding AAAA and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2"
     PTR6=$(ip6_to_ptr6 $2)
@@ -278,6 +283,7 @@ add_lease6() {
 del_lease6() {
     # $1 = hostname (LEASE6_HOSTNAME)
     # $2 = ipv6 address (LEASE6_ADDRESS)
+    # $3 = ipv6 local address (QUERY6_REMOTE_ADDR)
     HOSTNAME=$(clean_hostname $1)
     log "Removing AAAA and PTR records for ${HOSTNAME}.${LOCAL_DOMAIN} -> $2"
     PTR6=$(ip6_to_ptr6 $2)
@@ -401,15 +407,30 @@ leases6_committed () {
         for i in $SEQ; do
             LEASE6_ADDRESS=$(eval echo "\$LEASES6_AT${i}_ADDRESS")
             LEASE6_HOSTNAME=$(eval echo "\$LEASES6_AT${i}_HOSTNAME")
-            log "Committed lease6 ${LEASE6_ADDRESS} for ${LEASE6_HOSTNAME}"
-            add_lease6 $LEASE6_HOSTNAME $LEASE6_ADDRESS
+            if [ $QUERY6_REMOTE_ADDR ]; then
+                log "Committed lease6 ${LEASE6_ADDRESS}, ${QUERY6_REMOTE_ADDR} for ${LEASE6_HOSTNAME}"
+                add_lease6 $LEASE6_HOSTNAME $LEASE6_ADDRESS $QUERY6_REMOTE_ADDR
+            else
+                log "Committed lease6 ${LEASE6_ADDRESS} for ${LEASE6_HOSTNAME}"
+                add_lease6 $LEASE6_HOSTNAME $LEASE6_ADDRESS
+            fi
         done
     elif [ $LEASES6_AT0_ADDRESS ]; then
-        log "Committed lease6 ${LEASES6_AT0_ADDRESS} for ${LEASES6_AT0_HOSTNAME}"
-        add_lease6 $LEASES6_AT0_HOSTNAME $LEASES6_AT0_ADDRESS
+        if [ $QUERY6_REMOTE_ADDR ]; then
+            log "Committed lease6 ${LEASES6_AT0_ADDRESS}, ${QUERY6_REMOTE_ADDR} for ${LEASES6_AT0_HOSTNAME}"
+            add_lease6 $LEASES6_AT0_HOSTNAME $LEASES6_AT0_ADDRESS $QUERY6_REMOTE_ADDR
+        else
+            log "Committed lease6 ${LEASES6_AT0_ADDRESS} for ${LEASES6_AT0_HOSTNAME}"
+            add_lease6 $LEASES6_AT0_HOSTNAME $LEASES6_AT0_ADDRESS
+        fi
     elif [ $LEASE6_ADDRESS ]; then
-        log "Committed lease6 ${LEASE6_ADDRESS} for ${LEASE6_HOSTNAME}"
-        add_lease6 $LEASE6_HOSTNAME $LEASE6_ADDRESS
+        if [ $QUERY6_REMOTE_ADDR ]; then
+            log "Committed lease6 ${LEASE6_ADDRESS}, ${QUERY6_REMOTE_ADDR} for ${LEASE6_HOSTNAME}"
+            add_lease6 $LEASE6_HOSTNAME $LEASE6_ADDRESS $QUERY6_REMOTE_ADDR
+        else
+            log "Committed lease6 ${LEASE6_ADDRESS} for ${LEASE6_HOSTNAME}"
+            add_lease6 $LEASE6_HOSTNAME $LEASE6_ADDRESS
+        fi
     fi
 
     if [ $DELETED_LEASES6_SIZE -gt 0 ]; then
@@ -418,15 +439,30 @@ leases6_committed () {
         for i in $SEQ; do
             DELETED_LEASE6_ADDRESS=$(eval echo "\$DELETED_LEASES6_AT${i}_ADDRESS")
             DELETED_LEASE6_HOSTNAME=$(eval echo "\$DELETED_LEASES6_AT${i}_HOSTNAME")
-            log "Deleted lease6 ${DELETED_LEASE6_ADDRESS} for ${DELETED_LEASE6_HOSTNAME}"
-            del_lease6 $DELETED_LEASE6_HOSTNAME $DELETED_LEASE6_ADDRESS
+            if [ $QUERY6_REMOTE_ADDR ]; then
+                log "Deleted lease6 ${DELETED_LEASE6_ADDRESS}, ${QUERY6_REMOTE_ADDR} for ${DELETED_LEASE6_HOSTNAME}"
+                del_lease6 $DELETED_LEASE6_HOSTNAME $DELETED_LEASE6_ADDRESS $QUERY6_REMOTE_ADDR
+            else
+                log "Deleted lease6 ${DELETED_LEASE6_ADDRESS} for ${DELETED_LEASE6_HOSTNAME}"
+                del_lease6 $DELETED_LEASE6_HOSTNAME $DELETED_LEASE6_ADDRESS
+            fi
         done
     elif [ $DELETED_LEASES6_AT0_ADDRESS ]; then
-        log "Deleted lease6 ${DELETED_LEASES6_AT0_ADDRESS} for ${DELETED_LEASE6_AT0_HOSTNAME}"
-        del_lease6 $DELETED_LEASE6_AT0_HOSTNAME $DELETED_LEASES6_AT0_ADDRESS
+        if [ $QUERY6_REMOTE_ADDR ]; then
+            log "Deleted lease6 ${DELETED_LEASES6_AT0_ADDRESS}, ${QUERY6_REMOTE_ADDR} for ${DELETED_LEASES6_AT0_HOSTNAME}"
+            del_lease6 $DELETED_LEASES6_AT0_HOSTNAME $DELETED_LEASES6_AT0_ADDRESS $QUERY6_REMOTE_ADDR
+        else
+            log "Deleted lease6 ${DELETED_LEASES6_AT0_ADDRESS} for ${DELETED_LEASE6_AT0_HOSTNAME}"
+            del_lease6 $DELETED_LEASE6_AT0_HOSTNAME $DELETED_LEASES6_AT0_ADDRESS
+        fi
     elif [ $DELETED_LEASE6_ADDRESS ]; then
-        log "Deleted lease6 ${DELETED_LEASE6_ADDRESS} for ${DELETED_LEASE6_HOSTNAME}"
-        del_lease6 $DELETED_LEASE6_HOSTNAME $DELETED_LEASE6_ADDRESS
+        if [ $QUERY6_REMOTE_ADDR ]; then
+            log "Deleted lease6 ${DELETED_LEASE6_ADDRESS}, ${QUERY6_REMOTE_ADDR} for ${DELETED_LEASE6_HOSTNAME}"
+            del_lease6 $DELETED_LEASE6_HOSTNAME $DELETED_LEASE6_ADDRESS $QUERY6_REMOTE_ADDR
+        else
+            log "Deleted lease6 ${DELETED_LEASE6_ADDRESS} for ${DELETED_LEASE6_HOSTNAME}"
+            del_lease6 $DELETED_LEASE6_HOSTNAME $DELETED_LEASE6_ADDRESS
+        fi
     fi
 
     return 0
@@ -491,6 +527,10 @@ case "$1" in
         ;;
     "-v"|"--version")
         echo "$PROGNAME 0.1"
+        exit 0
+        ;;
+    "-s"|"--setup")
+        echo "$SETUP"
         exit 0
         ;;
     *)
