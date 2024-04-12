@@ -21,18 +21,31 @@ config_files = [
     "/usr/local/kea-lease-unbound-control.conf",
     "kea-lease-unbound-control.py.env",
     "kea-lease-unbound-control.env",
-    "/etc/default/kea-lease-unbound-control.conf"
+    "/etc/default/kea-lease-unbound-control.conf",
 ]
 
+
 def load_dotenv(dotenv_path: Path) -> None:
+    """
+    Load environment variables from .env file (key=value pairs, one per line, # for comments, no shell expansion)
+
+    Args:
+        dotenv_path (Path): Path to .env file
+
+    Raises:
+        FileNotFoundError: If .env file is not found
+    """
     with open(dotenv_path) as file:
         for line in file:
             if line.startswith("#"):
                 continue
             key, value = line.strip().split("=", 1)
-            if key.startswith("\"") and key.endswith("\""):
+            key = key.strip()
+            value = value.strip()
+            if key.startswith('"') and key.endswith('"'):
                 key = key[1:-1]
             os.environ[key] = value
+
 
 for file_path in config_files:
     if os.path.isfile(file_path):
@@ -116,39 +129,55 @@ chown kea:kea /path/to/kea-lease-unbound-control.sh.env
 ```
 """
 
+
 def log(message: str) -> None:
     """
     Log message to file
-    
+
     Args:
         message (str): Message to log
     """
     if os.getenv("LOG_ENABLED") == "1":
-            with open(LOG_FILE, "a") as log_file:
-                log_file.write(f"{datetime.now()} {PROGNAME}: {message}\n")
+        with open(LOG_FILE, "a") as log_file:
+            log_file.write(f"{datetime.now()} {PROGNAME}: {message}\n")
+
 
 def get_kea_hook_env_args() -> dict[str, str]:
     """
     Get Kea's hook env arguments as dict
-    
+
     Returns:
         dict: (str, str) Kea's hook env arguments as dict
     """
     env_args = {}
     for key, value in os.environ.items():
-        if key.startswith("QUERY4") or key.startswith("QUERY6") or key.startswith("LEASE4") or key.startswith("LEASE6") or key.startswith("LEASES4") or key.startswith("LEASES6") or key.startswith("DELETED_LEASE4") or key.startswith("DELETED_LEASE6") or key.startswith("SUBNET4") or key.startswith("SUBNET6") or key.startswith("PKT4") or key.startswith("PKT6"):
+        if (
+            key.startswith("QUERY4")
+            or key.startswith("QUERY6")
+            or key.startswith("LEASE4")
+            or key.startswith("LEASE6")
+            or key.startswith("LEASES4")
+            or key.startswith("LEASES6")
+            or key.startswith("DELETED_LEASE4")
+            or key.startswith("DELETED_LEASE6")
+            or key.startswith("SUBNET4")
+            or key.startswith("SUBNET6")
+            or key.startswith("PKT4")
+            or key.startswith("PKT6")
+        ):
             env_args[key] = value
     return env_args
+
 
 def is_ipv4(ip_str: str) -> bool:
     """
     Check if string is an IPv4 address
-    
+
     Args:
         ip_str (str): IP address
-        
+
     Returns:
-        bool: True if string is an IPv4 address, False otherwise    
+        bool: True if string is an IPv4 address, False otherwise
     """
     ip, _ = ip_str.split("/") if "/" in ip_str else (ip_str, "")
     try:
@@ -157,26 +186,28 @@ def is_ipv4(ip_str: str) -> bool:
     except ValueError:
         return False
 
+
 def ip_to_ptr(ip_str: str) -> str:
     """
     Convert IPv4 address to PTR record
-    
+
     Args:
         ip_str (str): IP address
-        
+
     Returns:
         str: PTR record
     """
     ip, _ = ip_str.split("/") if "/" in ip_str else (ip_str, "")
     return ipaddress.IPv4Address(ip).reverse_pointer
 
+
 def expand_ipv6(ip_str: str) -> str:
     """
     Expand IPv6 address
-    
+
     Args:
         ip_str (str): IPv6 address
-        
+
     Returns:
         str: Expanded IPv6 address
     """
@@ -184,13 +215,14 @@ def expand_ipv6(ip_str: str) -> str:
     ip = ipaddress.IPv6Address(ip).exploded
     return f"{ip}/{mask}" if mask else ip
 
+
 def compress_ipv6(ip_str: str) -> str:
     """
     Compress IPv6 address
-    
+
     Args:
         ip_str (str): IPv6 address
-        
+
     Returns:
         str: Compressed IPv6 address
     """
@@ -198,13 +230,14 @@ def compress_ipv6(ip_str: str) -> str:
     ip = ipaddress.IPv6Address(ip_str).compressed
     return f"{ip}/{mask}" if mask else ip
 
+
 def is_ipv6(ip_str: str) -> bool:
     """
     Check if string is an IPv6 address
-    
+
     Args:
         ip_str (str): IP address
-        
+
     Returns:
         bool: True if string is an IPv6 address, False otherwise
     """
@@ -215,13 +248,14 @@ def is_ipv6(ip_str: str) -> bool:
     except ValueError:
         return False
 
+
 def clean_hostname(hostname: str) -> str:
     """
     Clean hostname for local data entry (remove trailing dot, replace dots with hyphens)
-    
+
     Args:
         hostname (str): Hostname
-        
+
     Returns:
         str: Cleaned hostname
     """
@@ -231,10 +265,10 @@ def clean_hostname(hostname: str) -> str:
 def ip6_to_ptr6(ip_str: str) -> str | None:
     """
     Convert IPv6 address to PTR record
-    
+
     Args:
         ip_str (str): IPv6 address
-        
+
     Returns:
         str: PTR record
     """
@@ -244,13 +278,14 @@ def ip6_to_ptr6(ip_str: str) -> str | None:
     ptr = ip.reverse_pointer
     return f"{ptr}.ip6.arpa"
 
+
 def ptr_to_ip(ptr_str: str) -> str | None:
     """
     Convert PTR record to IPv4 address
-    
+
     Args:
         ptr_str (str): PTR record
-        
+
     Returns:
         str: IPv4 address
     """
@@ -260,13 +295,14 @@ def ptr_to_ip(ptr_str: str) -> str | None:
     ip_parts = [parts[i] for i in range(len(parts) - 3, -1, -1)]
     return ".".join(ip_parts)
 
+
 def ptr6_to_ip6(ptr_str: str) -> str | None:
     """
     Convert PTR record to IPv6 address
-    
+
     Args:
         ptr_str (str): PTR record
-    
+
     Returns:
         str: IPv6 address
     """
@@ -274,13 +310,16 @@ def ptr6_to_ip6(ptr_str: str) -> str | None:
     if parts[-1] != "ip6.arpa":
         return None
     ip_parts = [parts[i] for i in range(len(parts) - 2, -1, -1)]
-    ip_str = ":".join(["".join(ip_parts[i:i+4]) for i in range(0, len(ip_parts), 4)])
+    ip_str = ":".join(
+        ["".join(ip_parts[i : i + 4]) for i in range(0, len(ip_parts), 4)]
+    )
     return ipaddress.IPv6Address(ip_str).compressed
+
 
 def add_lease4(hostname: str, ipv4_address: str) -> None:
     """
     Add lease4 entry to unbound local data
-    
+
     Args:
     hostname (str): Hostname (LEASE4_HOSTNAME)
     ipv4_address (str): IPv4 address (LEASE4_ADDRESS)
@@ -288,14 +327,21 @@ def add_lease4(hostname: str, ipv4_address: str) -> None:
     HOSTNAME = clean_hostname(hostname)
     log(f"Adding A and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address}")
     PTR = ip_to_ptr(ipv4_address)
-    subprocess.run([UNBOUND_CONTROL, "local_data", f"{HOSTNAME}.{LOCAL_DOMAIN}", "A", ipv4_address])
-    subprocess.run([UNBOUND_CONTROL, "local_data", PTR, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"])
-    log(f"Added A and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address} -> {PTR}")
+    subprocess.run(
+        [UNBOUND_CONTROL, "local_data", f"{HOSTNAME}.{LOCAL_DOMAIN}", "A", ipv4_address]
+    )
+    subprocess.run(
+        [UNBOUND_CONTROL, "local_data", PTR, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"]
+    )
+    log(
+        f"Added A and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address} -> {PTR}"
+    )
+
 
 def del_lease4(hostname: str, ipv4_address: str) -> None:
     """
     Remove lease4 entry from unbound local data
-    
+
     Args:
     hostname (str): Hostname (LEASE4_HOSTNAME)
     ipv4_address (str): IPv4 address (LEASE4_ADDRESS)
@@ -303,14 +349,27 @@ def del_lease4(hostname: str, ipv4_address: str) -> None:
     HOSTNAME = clean_hostname(hostname)
     log(f"Removing A and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address}")
     PTR = ip_to_ptr(ipv4_address)
-    subprocess.run([UNBOUND_CONTROL, "local_data_remove", f"{HOSTNAME}.{LOCAL_DOMAIN}", "A", ipv4_address])
+    subprocess.run(
+        [
+            UNBOUND_CONTROL,
+            "local_data_remove",
+            f"{HOSTNAME}.{LOCAL_DOMAIN}",
+            "A",
+            ipv4_address,
+        ]
+    )
     subprocess.run([UNBOUND_CONTROL, "local_data_remove", PTR, "PTR", HOSTNAME])
-    log(f"Removed A and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address} -> {PTR}")
+    log(
+        f"Removed A and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv4_address} -> {PTR}"
+    )
 
-def add_lease6(hostname: str, ipv6_address: str, ipv6_local_address:str | None=None) -> None:
+
+def add_lease6(
+    hostname: str, ipv6_address: str, ipv6_local_address: str | None = None
+) -> None:
     """
     Add lease6 entry to unbound local data
-    
+
     Args:
     hostname (str): Hostname (LEASE6_HOSTNAME)
     ipv6_address (str): IPv6 address (LEASE6_ADDRESS)
@@ -319,39 +378,93 @@ def add_lease6(hostname: str, ipv6_address: str, ipv6_local_address:str | None=N
     HOSTNAME = clean_hostname(hostname)
     log(f"Adding AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}")
     PTR6 = ip6_to_ptr6(ipv6_address)
-    subprocess.run([UNBOUND_CONTROL, "local_data", f"{HOSTNAME}.{LOCAL_DOMAIN}", "AAAA", ipv6_address])
-    subprocess.run([UNBOUND_CONTROL, "local_data", PTR6, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"]) # type: ignore
+    subprocess.run(
+        [
+            UNBOUND_CONTROL,
+            "local_data",
+            f"{HOSTNAME}.{LOCAL_DOMAIN}",
+            "AAAA",
+            ipv6_address,
+        ]
+    )
+    subprocess.run([UNBOUND_CONTROL, "local_data", PTR6, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"])  # type: ignore
     if ipv6_local_address:
         PTR6LOCAL = ip6_to_ptr6(ipv6_local_address)
-        subprocess.run([UNBOUND_CONTROL, "local_data", f"{HOSTNAME}.{LOCAL_DOMAIN}", "AAAA", ipv6_local_address])
-        subprocess.run([UNBOUND_CONTROL, "local_data", f"{PTR6LOCAL}.{LOCAL_DOMAIN}", "PTR", HOSTNAME])
-        log(f"Added AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}, {ipv6_local_address} -> {PTR6}, {PTR6LOCAL}")
+        subprocess.run(
+            [
+                UNBOUND_CONTROL,
+                "local_data",
+                f"{HOSTNAME}.{LOCAL_DOMAIN}",
+                "AAAA",
+                ipv6_local_address,
+            ]
+        )
+        subprocess.run(
+            [
+                UNBOUND_CONTROL,
+                "local_data",
+                f"{PTR6LOCAL}.{LOCAL_DOMAIN}",
+                "PTR",
+                HOSTNAME,
+            ]
+        )
+        log(
+            f"Added AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}, {ipv6_local_address} -> {PTR6}, {PTR6LOCAL}"
+        )
     else:
-        log(f"Added AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address} -> {PTR6}")
+        log(
+            f"Added AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address} -> {PTR6}"
+        )
 
-def del_lease6(hostname: str, ipv6_address: str, ipv6_local_address: str | None=None) -> None:
+
+def del_lease6(
+    hostname: str, ipv6_address: str, ipv6_local_address: str | None = None
+) -> None:
     """
     Remove lease6 entry from unbound local data
-    
+
     Args:
     hostname (str): Hostname (LEASE6_HOSTNAME)
     ipv6_address (str): IPv6 address (LEASE6_ADDRESS)
     ipv6_local_address (str, optional): IPv6 local address (QUERY6_REMOTE_ADDR)
     """
     HOSTNAME = clean_hostname(hostname)
-    log(f"Removing AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}")
+    log(
+        f"Removing AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}"
+    )
     PTR6 = ip6_to_ptr6(ipv6_address)
-    subprocess.run([UNBOUND_CONTROL, "local_data_remove", f"{HOSTNAME}.{LOCAL_DOMAIN}", "AAAA", ipv6_address])
-    subprocess.run([UNBOUND_CONTROL, "local_data_remove", PTR6, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"]) # type: ignore
+    subprocess.run(
+        [
+            UNBOUND_CONTROL,
+            "local_data_remove",
+            f"{HOSTNAME}.{LOCAL_DOMAIN}",
+            "AAAA",
+            ipv6_address,
+        ]
+    )
+    subprocess.run([UNBOUND_CONTROL, "local_data_remove", PTR6, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"])  # type: ignore
     if ipv6_local_address:
         PTR6LOCAL = ip6_to_ptr6(ipv6_local_address)
-        subprocess.run([UNBOUND_CONTROL, "local_data_remove", f"{HOSTNAME}.{LOCAL_DOMAIN}", "AAAA", ipv6_local_address])
-        subprocess.run([UNBOUND_CONTROL, "local_data_remove", PTR6LOCAL, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"]) # type: ignore
-        log(f"Removed AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}, {ipv6_local_address} -> {PTR6}, {PTR6LOCAL}")
+        subprocess.run(
+            [
+                UNBOUND_CONTROL,
+                "local_data_remove",
+                f"{HOSTNAME}.{LOCAL_DOMAIN}",
+                "AAAA",
+                ipv6_local_address,
+            ]
+        )
+        subprocess.run([UNBOUND_CONTROL, "local_data_remove", PTR6LOCAL, "PTR", f"{HOSTNAME}.{LOCAL_DOMAIN}"])  # type: ignore
+        log(
+            f"Removed AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address}, {ipv6_local_address} -> {PTR6}, {PTR6LOCAL}"
+        )
     else:
-        log(f"Removed AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address} -> {PTR6}")
+        log(
+            f"Removed AAAA and PTR records for {HOSTNAME}.{LOCAL_DOMAIN} -> {ipv6_address} -> {PTR6}"
+        )
 
-def handle_add_lease4(env: dict[str, str] | None=None) -> None:
+
+def handle_add_lease4(env: dict[str, str] | None = None) -> None:
     """
     Add lease4 entry to unbound local data
     """
@@ -365,7 +478,8 @@ def handle_add_lease4(env: dict[str, str] | None=None) -> None:
         LEASE4_HOSTNAME = env["LEASE4_HOSTNAME"]
         add_lease4(LEASE4_HOSTNAME, LEASE4_ADDRESS)
 
-def handle_del_lease4(env: dict[str, str] | None=None) -> None:
+
+def handle_del_lease4(env: dict[str, str] | None = None) -> None:
     """
     Remove lease4 entry from unbound local data
     """
@@ -379,7 +493,8 @@ def handle_del_lease4(env: dict[str, str] | None=None) -> None:
         LEASE4_HOSTNAME = env["LEASE4_HOSTNAME"]
         del_lease4(LEASE4_HOSTNAME, LEASE4_ADDRESS)
 
-def handle_add_lease6(env: dict[str, str] | None=None) -> None:
+
+def handle_add_lease6(env: dict[str, str] | None = None) -> None:
     """
     Add lease6 entry to unbound local data
     """
@@ -397,7 +512,8 @@ def handle_add_lease6(env: dict[str, str] | None=None) -> None:
         else:
             add_lease6(LEASE6_HOSTNAME, LEASE6_ADDRESS)
 
-def handle_del_lease6(env: dict[str, str] | None=None) -> None:
+
+def handle_del_lease6(env: dict[str, str] | None = None) -> None:
     """
     Remove lease6 entry from unbound local data
     """
@@ -416,15 +532,17 @@ def handle_del_lease6(env: dict[str, str] | None=None) -> None:
             del_lease6(LEASE6_HOSTNAME, LEASE6_ADDRESS)
 
 
-def unknown_handle(args: list[str]) -> None: 
+def unknown_handle(args: list[str]) -> None:
     print("Unknown command:", " ".join(args))
     sys.exit(1)
+
 
 def lease4_renew() -> None:
     """
     Renews the IPv4 lease for the specified hostname and address.
     """
     handle_add_lease4()
+
 
 def lease4_expire() -> None:
     """
@@ -439,6 +557,7 @@ def lease4_recover() -> None:
     """
     handle_add_lease4()
 
+
 def leases4_committed() -> None:
     """
     Handles committed IPv4 leases and deleted IPv4 leases.
@@ -448,14 +567,14 @@ def leases4_committed() -> None:
     if len(keys) == 0:
         log("No environment arguments found")
         return None
-    
+
     if "LEASES4_SIZE" in keys:
         LEASES4_SIZE = int(env["LEASES4_SIZE"])
         MAX_LEASES = LEASES4_SIZE - 1
         SEQ = range(LEASES4_SIZE)
     else:
         LEASES4_SIZE = 0
-    
+
     if LEASES4_SIZE > 0:
         for i in SEQ:
             if f"LEASES4_AT{i}_HOSTNAME" in keys and f"LEASES4_AT{i}_ADDRESS" in keys:
@@ -478,10 +597,15 @@ def leases4_committed() -> None:
 
     if DELETED_LEASES4_SIZE > 0:
         for i in SEQ:
-            if f"DELETED_LEASES4_AT{i}_HOSTNAME" in keys and f"DELETED_LEASES4_AT{i}_ADDRESS" in keys:
+            if (
+                f"DELETED_LEASES4_AT{i}_HOSTNAME" in keys
+                and f"DELETED_LEASES4_AT{i}_ADDRESS" in keys
+            ):
                 DELETED_LEASE4_HOSTNAME = env[f"DELETED_LEASES4_AT{i}_HOSTNAME"]
                 DELETED_LEASE4_ADDRESS = env[f"DELETED_LEASES4_AT{i}_ADDRESS"]
-                log(f"Deleted lease4 {DELETED_LEASE4_ADDRESS} for {DELETED_LEASE4_HOSTNAME}")
+                log(
+                    f"Deleted lease4 {DELETED_LEASE4_ADDRESS} for {DELETED_LEASE4_HOSTNAME}"
+                )
                 del_lease4(DELETED_LEASE4_HOSTNAME, DELETED_LEASE4_ADDRESS)
     elif "DELETED_LEASE4_ADDRESS" in keys and "DELETED_LEASE4_HOSTNAME" in keys:
         DELETED_LEASE4_ADDRESS = env["DELETED_LEASE4_ADDRESS"]
@@ -489,11 +613,13 @@ def leases4_committed() -> None:
         log(f"Deleted lease4 {DELETED_LEASE4_ADDRESS} for {DELETED_LEASE4_HOSTNAME}")
         del_lease4(DELETED_LEASE4_HOSTNAME, DELETED_LEASE4_ADDRESS)
 
+
 def lease4_release() -> None:
     """
     Releases the IPv4 lease for the specified hostname and address.
     """
     handle_del_lease4()
+
 
 def lease4_decline() -> None:
     """
@@ -501,11 +627,13 @@ def lease4_decline() -> None:
     """
     return None
 
+
 def lease6_renew() -> None:
     """
     Renews an IPv6 lease.
     """
     handle_add_lease6()
+
 
 def lease6_rebind() -> None:
     """
@@ -513,17 +641,20 @@ def lease6_rebind() -> None:
     """
     handle_add_lease6()
 
+
 def lease6_expire() -> None:
     """
     Expires an IPv6 lease.
     """
     handle_del_lease6()
 
+
 def lease6_recover() -> None:
     """
     Recovers an IPv6 lease.
     """
     handle_add_lease6()
+
 
 def leases6_committed():
     """
@@ -534,14 +665,14 @@ def leases6_committed():
     if len(keys) == 0:
         log("No environment arguments found")
         return None
-    
+
     if "LEASES6_SIZE" in keys:
         LEASES6_SIZE = int(env["LEASES6_SIZE"])
         MAX_LEASES = LEASES6_SIZE - 1
         SEQ = range(LEASES6_SIZE)
     else:
         LEASES6_SIZE = 0
-    
+
     if LEASES6_SIZE > 0:
         MAX_LEASES = LEASES6_SIZE - 1
         SEQ = range(MAX_LEASES + 1)
@@ -551,7 +682,9 @@ def leases6_committed():
                 LEASE6_HOSTNAME = env[f"LEASES6_AT{i}_HOSTNAME"]
                 if "QUERY6_REMOTE_ADDR" in keys:
                     QUERY6_REMOTE_ADDR = env["QUERY6_REMOTE_ADDR"]
-                    log(f"Committed lease6 {LEASE6_ADDRESS}, {QUERY6_REMOTE_ADDR} for {LEASE6_HOSTNAME}")
+                    log(
+                        f"Committed lease6 {LEASE6_ADDRESS}, {QUERY6_REMOTE_ADDR} for {LEASE6_HOSTNAME}"
+                    )
                     add_lease6(LEASE6_HOSTNAME, LEASE6_ADDRESS, QUERY6_REMOTE_ADDR)
                 else:
                     log(f"Committed lease6 {LEASE6_ADDRESS} for {LEASE6_HOSTNAME}")
@@ -561,12 +694,14 @@ def leases6_committed():
         LEASE6_HOSTNAME = env["LEASE6_HOSTNAME"]
         if "QUERY6_REMOTE_ADDR" in keys:
             QUERY6_REMOTE_ADDR = env["QUERY6_REMOTE_ADDR"]
-            log(f"Committed lease6 {LEASE6_ADDRESS}, {QUERY6_REMOTE_ADDR} for {LEASE6_HOSTNAME}")
+            log(
+                f"Committed lease6 {LEASE6_ADDRESS}, {QUERY6_REMOTE_ADDR} for {LEASE6_HOSTNAME}"
+            )
             add_lease6(LEASE6_HOSTNAME, LEASE6_ADDRESS, QUERY6_REMOTE_ADDR)
         else:
             log(f"Committed lease6 {LEASE6_ADDRESS} for {LEASE6_HOSTNAME}")
             add_lease6(LEASE6_HOSTNAME, LEASE6_ADDRESS)
-    
+
     if "DELETED_LEASES6_SIZE" in keys:
         DELETED_LEASES6_SIZE = int(env["DELETED_LEASES6_SIZE"])
         MAX_LEASES = DELETED_LEASES6_SIZE - 1
@@ -578,26 +713,44 @@ def leases6_committed():
         MAX_LEASES = DELETED_LEASES6_SIZE - 1
         SEQ = range(MAX_LEASES + 1)
         for i in SEQ:
-            if f"DELETED_LEASES6_AT{i}_ADDRESS" in keys and f"DELETED_LEASES6_AT{i}_HOSTNAME" in keys:
+            if (
+                f"DELETED_LEASES6_AT{i}_ADDRESS" in keys
+                and f"DELETED_LEASES6_AT{i}_HOSTNAME" in keys
+            ):
                 DELETED_LEASE6_ADDRESS = env[f"DELETED_LEASES6_AT{i}_ADDRESS"]
                 DELETED_LEASE6_HOSTNAME = env[f"DELETED_LEASES6_AT{i}_HOSTNAME"]
                 if "QUERY6_REMOTE_ADDR" in keys:
                     QUERY6_REMOTE_ADDR = env["QUERY6_REMOTE_ADDR"]
-                    log(f"Deleted lease6 {DELETED_LEASE6_ADDRESS}, {QUERY6_REMOTE_ADDR} for {DELETED_LEASE6_HOSTNAME}")
-                    del_lease6(DELETED_LEASE6_HOSTNAME, DELETED_LEASE6_ADDRESS, QUERY6_REMOTE_ADDR)
+                    log(
+                        f"Deleted lease6 {DELETED_LEASE6_ADDRESS}, {QUERY6_REMOTE_ADDR} for {DELETED_LEASE6_HOSTNAME}"
+                    )
+                    del_lease6(
+                        DELETED_LEASE6_HOSTNAME,
+                        DELETED_LEASE6_ADDRESS,
+                        QUERY6_REMOTE_ADDR,
+                    )
                 else:
-                    log(f"Deleted lease6 {DELETED_LEASE6_ADDRESS} for {DELETED_LEASE6_HOSTNAME}")
+                    log(
+                        f"Deleted lease6 {DELETED_LEASE6_ADDRESS} for {DELETED_LEASE6_HOSTNAME}"
+                    )
                     del_lease6(DELETED_LEASE6_HOSTNAME, DELETED_LEASE6_ADDRESS)
     elif "DELETED_LEASE6_ADDRESS:" in keys and "DELETED_LEASE6_HOSTNAME" in keys:
         DELETED_LEASE6_ADDRESS = env["DELETED_LEASE6_ADDRESS"]
         DELETED_LEASE6_HOSTNAME = env["DELETED_LEASE6_HOSTNAME"]
         if "QUERY6_REMOTE_ADDR" in keys:
             QUERY6_REMOTE_ADDR = env["QUERY6_REMOTE_ADDR"]
-            log(f"Deleted lease6 {DELETED_LEASE6_ADDRESS}, {QUERY6_REMOTE_ADDR} for {DELETED_LEASE6_HOSTNAME}")
-            del_lease6(DELETED_LEASE6_HOSTNAME, DELETED_LEASE6_ADDRESS, QUERY6_REMOTE_ADDR)
+            log(
+                f"Deleted lease6 {DELETED_LEASE6_ADDRESS}, {QUERY6_REMOTE_ADDR} for {DELETED_LEASE6_HOSTNAME}"
+            )
+            del_lease6(
+                DELETED_LEASE6_HOSTNAME, DELETED_LEASE6_ADDRESS, QUERY6_REMOTE_ADDR
+            )
         else:
-            log(f"Deleted lease6 {DELETED_LEASE6_ADDRESS} for {DELETED_LEASE6_HOSTNAME}")
+            log(
+                f"Deleted lease6 {DELETED_LEASE6_ADDRESS} for {DELETED_LEASE6_HOSTNAME}"
+            )
             del_lease6(DELETED_LEASE6_HOSTNAME, DELETED_LEASE6_ADDRESS)
+
 
 def lease6_release() -> None:
     """
@@ -605,17 +758,19 @@ def lease6_release() -> None:
     """
     handle_del_lease6()
 
+
 def lease6_decline() -> None:
     """
     Declines an IPv6 lease.
     """
     return None
 
+
 if __name__ == "__main__":
 
     if len(sys.argv) > 1:
         command = sys.argv[1]
-        
+
         if command == "lease4_renew":
             lease4_renew()
         elif command == "lease4_expire":
